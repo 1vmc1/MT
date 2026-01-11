@@ -21,14 +21,12 @@
         group: ubuntu
         mode: '0755'
 
-   - name: Copy application files
+    - name: Copy application files
       synchronize:
-        # Мы берем всё из корня репозитория (на один уровень выше папки ansible)
         src: ../
         dest: /opt/app/
         delete: yes
         rsync_opts:
-          # Исключаем служебные папки, чтобы не копировать лишнее на сервер
           - "--exclude=.git"
           - "--exclude=terraform"
           - "--exclude=ansible"
@@ -41,10 +39,9 @@
         executable: /bin/bash
       become_user: ubuntu
 
-    # ✅ SYSTEMD ТОЛЬКО ЗДЕСЬ (ПОСЛЕ app.sh)
     - name: Install music-api systemd unit
       copy:
-        src: ../app/systemd/music-api.service
+        src: ../systemd/music-api.service
         dest: /etc/systemd/system/music-api.service
         owner: root
         group: root
@@ -91,4 +88,3 @@
         state: started
       register: bot_status
       failed_when: bot_status.status.ActiveState != 'active'
-
