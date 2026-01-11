@@ -10,6 +10,7 @@
           - python3
           - python3-pip
           - python3-venv
+          - rsync
         state: present
         update_cache: yes
 
@@ -21,9 +22,9 @@
         group: ubuntu
         mode: '0755'
 
-    - name: Copy application files
+    - name: Copy application files (repo root -> /opt/app)
       synchronize:
-        src: ../
+        src: .././
         dest: /opt/app/
         delete: yes
         rsync_opts:
@@ -33,9 +34,25 @@
           - "--exclude=.gradio"
           - "--exclude=old_cache"
 
+    - name: Check app.sh exists
+      stat:
+        path: /opt/app/app.sh
+      register: appsh
+
+    - name: Fail if app.sh is missing
+      fail:
+        msg: "/opt/app/app.sh not found after copy. Check repo structure and synchronize src/dest."
+      when: not appsh.stat.exists
+
+    - name: Ensure app.sh is executable
+      file:
+        path: /opt/app/app.sh
+        mode: '0755'
+
     - name: Run application setup script
-      shell: /opt/app/app.sh
+      shell: bash ./app.sh
       args:
+        chdir: /opt/app
         executable: /bin/bash
       become_user: ubuntu
 
@@ -47,7 +64,7 @@
         group: root
         mode: '0644'
 
-    - name: Install music-bot systemd unit
+    - name: Install music-bot systemd unit (template with token)
       template:
         src: music-bot.service.j2
         dest: /etc/systemd/system/music-bot.service
@@ -75,16 +92,12 @@
       pause:
         seconds: 3
 
-    - name: Check music-api status
-      systemd:
-        name: music-api
-        state: started
-      register: api_status
-      failed_when: api_status.status.ActiveState != 'active'
+    - name: Check music-api is active
+      shell: systemctl is-active --quiet music-api
+      register: api_active
+      changed_when: false
 
-    - name: Check music-bot status
-      systemd:
-        name: music-bot
-        state: started
-      register: bot_status
-      failed_when: bot_status.status.ActiveState != 'active'
+    - name: Check music-bot is active
+      shell: systemctl is-active --quiet music-bot
+      register: bot_active
+      changed_when: false
