@@ -1,0 +1,16 @@
+[Unit]
+Description=Music Telegram Bot
+After=network.target music-api.service
+Requires=music-api.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/app
+Environment=TELEGRAM_TOKEN={{ 8137581059:AAFOSgGg1RE-Kq0coZceSYncj_L89DMdYK0 }}
+ExecStart=/opt/app/.venv/bin/python -u bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
