@@ -1,0 +1,12 @@
+[Unit]
+Description=Music Telegram Bot
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/app
+ExecStart=/opt/app/.venv/bin/python bot.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
