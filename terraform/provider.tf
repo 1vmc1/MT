@@ -5,8 +5,8 @@ terraform {
       version = "~> 1.54.1"
     }
   }
+
+  required_version = ">= 1.3.0"
 }
 
-provider "openstack" {
-  # Данные берутся из OS_CLOUD в Jenkinsfile
-}
+provider "openstack" {}
