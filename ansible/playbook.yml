@@ -4,102 +4,72 @@
   become: yes
 
   vars:
-    app_dir: /opt/app
+    # Путь к корню проекта относительно playbook.yml
+    # В Jenkins это обычно на один уровень выше папки ansible/
+    local_project_root: "{{ playbook_dir }}/../"
+    remote_app_dir: /opt/app
 
   tasks:
-    - name: Update apt cache
-      apt:
-        update_cache: yes
-        cache_valid_time: 3600
-
     - name: Install required packages
       apt:
-        name:
-          - curl
-          - git
-          - python3-pip
+        name: [curl, git, python3-pip, rsync]
         state: present
-
-    - name: Check if Docker is installed
-      shell: which docker || true
-      register: docker_check
-      changed_when: false
+        update_cache: yes
 
     - name: Install Docker
-      shell: |
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sh get-docker.sh
-        rm get-docker.sh
-      when: docker_check.stdout == ""
+      shell: curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
 
-    - name: Reload systemd (after Docker install)
-      shell: systemctl daemon-reexec || systemctl daemon-reload
-      changed_when: false
-
-    - name: Start Docker service
-      shell: |
-        systemctl start docker || service docker start
-        systemctl enable docker || true
-      changed_when: false
-
-    - name: Verify Docker is running (any path)
-      shell: |
-        set -e
-        DOCKER_BIN="$(command -v docker || true)"
-
-        if [ -z "$DOCKER_BIN" ]; then
-          echo "Docker binary not found in PATH"
-          echo "PATH=$PATH"
-          ls -l /usr/bin /usr/local/bin || true
-          exit 1
-        fi
-
-        echo "Using docker at $DOCKER_BIN"
-        "$DOCKER_BIN" info
-      changed_when: false
+    - name: Start Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
 
     - name: Install Docker Compose
       get_url:
         url: "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-Linux-x86_64"
         dest: /usr/local/bin/docker-compose
         mode: '0755'
-      args:
-        creates: /usr/local/bin/docker-compose
 
     - name: Create app directory
       file:
-        path: "{{ app_dir }}"
+        path: "{{ remote_app_dir }}"
         state: directory
         mode: '0755'
 
     - name: Copy application files
       synchronize:
-        src: ../
-        dest: "{{ app_dir }}"
+        # Используем явный путь от директории плейбука
+        src: "{{ local_project_root }}"
+        dest: "{{ remote_app_dir }}/"
         delete: yes
         rsync_opts:
           - "--exclude=.git"
           - "--exclude=ansible"
           - "--exclude=terraform"
-          - "--exclude=__pycache__"
 
     - name: Create .env file
       copy:
-        dest: "{{ app_dir }}/.env"
-        content: |
-          TELEGRAM_BOT_TOKEN={{ telegram_token }}
+        dest: "{{ remote_app_dir }}/.env"
+        content: "TELEGRAM_BOT_TOKEN={{ telegram_token }}\n"
         mode: '0600'
 
     - name: Make scripts executable
       file:
-        path: "{{ app_dir }}/{{ item }}"
+        path: "{{ remote_app_dir }}/{{ item }}"
         mode: '0755'
       loop:
         - app.sh
         - healthcheck.sh
 
     - name: Run deployment script
-      shell: bash {{ app_dir }}/app.sh
+      shell: bash ./app.sh
       args:
-        chdir: "{{ app_dir }}"
+        chdir: "{{ remote_app_dir }}"
+      register: deploy_out
 
+    - name: Show deploy output
+      debug:
+        var: deploy_out.stdout_lines
