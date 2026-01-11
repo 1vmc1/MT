@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Веса модели (НЕ коммитим, слишком большие)
+*.pth
+*.pt
+*.ckpt
+
+# Данные
+data/
+*.mp3
+*.wav
+*.ogg
+
+# Логи
+*.log
+app.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Секреты
+client_secret.json
+.env
+
+# Временные файлы
+temp_*
+last_segmented_prediction.txt
+
+# Dataset
+archive/

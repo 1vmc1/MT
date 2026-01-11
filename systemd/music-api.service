@@ -1,0 +1,17 @@
+[Unit]
+Description=Music Genre API Service
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/music-api
+Environment=PORT=8000
+Environment=WEIGHTS_PATH=/opt/music-api/best_model.pth
+Environment=LABELS_PATH=/opt/music-api/labels.json
+# Путь к питону внутри виртуального окружения, которое создаст Jenkins
+ExecStart=/opt/music-api/.venv/bin/python3 api.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
