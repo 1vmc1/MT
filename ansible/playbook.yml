@@ -1,130 +1,21 @@
----
-- name: Deploy Music Classifier with Docker
-  hosts: all
-  become: yes
+- name: Copy docker-compose.yml
+  copy:
+    src: "{{ local_project_root }}/docker-compose.yml"
+    dest: "{{ remote_app_dir }}/docker-compose.yml"
+    mode: "0644"
 
-  vars:
-    # Путь к корню проекта относительно playbook.yml
-    # В Jenkins это обычно на один уровень выше папки ansible/
-    local_project_root: "{{ playbook_dir }}/../"
-    remote_app_dir: /opt/app
+- name: Create .env file with Telegram token
+  copy:
+    dest: "{{ remote_app_dir }}/.env"
+    content: "TELEGRAM_BOT_TOKEN={{ telegram_token }}\n"
+    mode: '0600'
 
-  tasks:
-    - name: HARD CLEAN old Docker APT config (must be first)
-      shell: |
-        set -e
-        rm -f /etc/apt/sources.list.d/docker.list
-        rm -f /etc/apt/sources.list.d/docker.list.save
-        rm -f /etc/apt/keyrings/docker.asc
-        rm -f /etc/apt/trusted.gpg.d/docker.gpg
-        sed -i '/download.docker.com/d' /etc/apt/sources.list || true
-      changed_when: false
+- name: Pull latest images from Docker Hub
+  shell: docker-compose pull
+  args:
+    chdir: "{{ remote_app_dir }}"
 
-    - name: Install required packages
-      apt:
-        name: [curl, git, python3-pip, rsync]
-        state: present
-        update_cache: yes
-
-    - name: Install Docker dependencies
-      apt:
-        name:
-          - ca-certificates
-          - gnupg
-          - lsb-release
-        state: present
-
-    - name: Add Docker GPG key
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        state: present
-
-    - name: Add Docker repository
-      apt_repository:
-        repo: "deb https://download.docker.com/linux/ubuntu focal stable"
-        state: present
-        filename: docker
-
-    - name: Install Docker (pinned packages)
-      apt:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-buildx-plugin
-          - docker-compose-plugin
-        state: present
-        update_cache: yes
-
-    - name: Start Docker
-      systemd:
-        name: docker
-        state: started
-        enabled: yes
-
-    - name: Create app directory
-      file:
-        path: "{{ remote_app_dir }}"
-        state: directory
-        mode: '0755'
-
-    - name: Copy application files
-      synchronize:
-        src: "{{ local_project_root }}"
-        dest: "{{ remote_app_dir }}/"
-        delete: yes
-        rsync_opts:
-          - "--exclude=.git"
-          - "--exclude=ansible"
-          - "--exclude=terraform"
-          
-    - name: Ensure Dockerfile is copied correctly
-      copy:
-        src: "{{ local_project_root }}/Dockerfile"
-        dest: "{{ remote_app_dir }}/Dockerfile"
-        mode: "0644"
-        
-    - name: Create .env file
-      copy:
-        dest: "{{ remote_app_dir }}/.env"
-        content: "TELEGRAM_BOT_TOKEN={{ telegram_token }}\n"
-        mode: '0600'
-
-    - name: Make scripts executable
-      file:
-        path: "{{ remote_app_dir }}/{{ item }}"
-        mode: '0755'
-      loop:
-        - app.sh
-        - healthcheck.sh
-
-    - name: "Debug: list app dir and show first lines of Dockerfile and docker-compose.yml"
-      shell: |
-        set -e
-        ls -la {{ remote_app_dir }}
-        echo "----- Dockerfile (head) -----"
-        sed -n '1,30p' {{ remote_app_dir }}/Dockerfile || true
-        echo "----- docker-compose.yml (head) -----"
-        sed -n '1,30p' {{ remote_app_dir }}/docker-compose.yml || true
-      args:
-        executable: /bin/bash
-      register: dbg  # <--- ДОБАВЬ ЭТУ СТРОКУ
-      changed_when: false
-
-    - name: Show debug output
-      debug:
-        var: dbg.stdout_lines
-        
-    - name: Run deployment script
-      shell: bash ./app.sh
-      args:
-        chdir: "{{ remote_app_dir }}"
-      register: deploy_out
-
-    - name: Show deploy output
-      debug:
-        var: deploy_out.stdout_lines
-
-
-
-
+- name: Start containers
+  shell: docker-compose up -d
+  args:
+    chdir: "{{ remote_app_dir }}"
