@@ -15,14 +15,16 @@ if [[ ! -f .env ]]; then
     exit 1
 fi
 
+# Проверка Docker
 if ! command -v docker &> /dev/null; then
     echo -e "${YELLOW}[app.sh] Installing Docker...${NC}"
     curl -fsSL https://get.docker.com -o get-docker.sh
     sudo sh get-docker.sh
-    sudo usermod -aG docker $USER
+    sudo usermod -aG docker ubuntu  # явно указываем пользователя ubuntu
     rm get-docker.sh
 fi
 
+# Проверка Docker Compose
 if ! command -v docker-compose &> /dev/null; then
     echo -e "${YELLOW}[app.sh] Installing Docker Compose...${NC}"
     sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" \
@@ -30,25 +32,44 @@ if ! command -v docker-compose &> /dev/null; then
     sudo chmod +x /usr/local/bin/docker-compose
 fi
 
+# Остановка старых контейнеров
 echo -e "${YELLOW}[app.sh] Stopping old containers...${NC}"
-sudo docker-compose down --remove-orphans || true
+sudo docker-compose down --remove-orphans 2>/dev/null || true
 
+# Сборка и запуск
 echo -e "${YELLOW}[app.sh] Building and starting containers...${NC}"
 sudo docker-compose build --no-cache
 sudo docker-compose up -d
 
+# Ожидание запуска
 echo -e "${YELLOW}[app.sh] Waiting for services...${NC}"
 sleep 15
 
+# Статус контейнеров
 echo -e "${GREEN}[app.sh] Container status:${NC}"
 sudo docker-compose ps
 
-if curl -f http://localhost:8000/health &> /dev/null; then
-    echo -e "${GREEN}✓ API is healthy${NC}"
-else
-    echo -e "${RED}✗ API health check failed${NC}"
-fi
+# Проверка здоровья API
+echo -e "${YELLOW}[app.sh] Checking API health...${NC}"
+for i in {1..10}; do
+    if curl -f http://localhost:8000/health &> /dev/null; then
+        echo -e "${GREEN}✓ API is healthy${NC}"
+        break
+    fi
+    if [ $i -eq 10 ]; then
+        echo -e "${RED}✗ API health check failed after 10 attempts${NC}"
+    else
+        echo "Attempt $i/10 failed, retrying in 3s..."
+        sleep 3
+    fi
+done
+
+# Логи
+echo -e "${GREEN}[app.sh] Recent logs:${NC}"
+echo -e "${YELLOW}=== API logs ===${NC}"
+sudo docker logs --tail 30 music-api 2>/dev/null || echo "music-api container not found"
+
+echo -e "${YELLOW}=== BOT logs ===${NC}"
+sudo docker logs --tail 30 music-bot 2>/dev/null || echo "music-bot container not found"
 
 echo -e "${GREEN}[app.sh] Deployment complete!${NC}"
-sudo docker logs --tail 20 music-api
-sudo docker logs --tail 20 music-bot
