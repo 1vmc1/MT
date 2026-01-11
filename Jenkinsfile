@@ -15,7 +15,7 @@ pipeline {
                         terraform init
                         terraform apply -auto-approve \
                           -var="image_name=ubuntu-20.04" \
-                          -var="flavor_name=m1.small" \
+                          -var="flavor_name=m1.large" \
                           -var="network_name=sutdents-net" \
                           -var="keypair=jenkins-key"
                         terraform output -raw vm_ip > ../ansible/ip.txt
