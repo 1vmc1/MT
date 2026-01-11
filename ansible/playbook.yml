@@ -2,9 +2,9 @@
 - name: Deploy Music Classifier with Docker
   hosts: all
   become: yes
+
   vars:
     app_dir: /opt/app
-    telegram_token: "{{ telegram_token }}"
 
   tasks:
     - name: Update apt cache
@@ -21,9 +21,8 @@
         state: present
 
     - name: Check if Docker is installed
-      command: docker --version
+      shell: which docker || true
       register: docker_check
-      ignore_errors: yes
       changed_when: false
 
     - name: Install Docker
@@ -31,15 +30,7 @@
         curl -fsSL https://get.docker.com -o get-docker.sh
         sh get-docker.sh
         rm get-docker.sh
-      when: docker_check.rc != 0
-
-    - name: Install Docker Compose
-      get_url:
-        url: "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-Linux-x86_64"
-        dest: /usr/local/bin/docker-compose
-        mode: '0755'
-      args:
-        creates: /usr/local/bin/docker-compose
+      when: docker_check.stdout == ""
 
     - name: Reload systemd (after Docker install)
       shell: systemctl daemon-reexec || systemctl daemon-reload
@@ -51,7 +42,7 @@
         systemctl enable docker || true
       changed_when: false
 
-   - name: Verify Docker is running (explicit path)
+    - name: Verify Docker is running (explicit path)
       shell: |
         if [ -x /usr/bin/docker ]; then
           /usr/bin/docker info
@@ -62,6 +53,14 @@
           exit 1
         fi
       changed_when: false
+
+    - name: Install Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-Linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+      args:
+        creates: /usr/local/bin/docker-compose
 
     - name: Create app directory
       file:
@@ -76,9 +75,9 @@
         delete: yes
         rsync_opts:
           - "--exclude=.git"
-          - "--exclude=__pycache__"
-          - "--exclude=terraform"
           - "--exclude=ansible"
+          - "--exclude=terraform"
+          - "--exclude=__pycache__"
 
     - name: Create .env file
       copy:
@@ -99,26 +98,3 @@
       shell: bash {{ app_dir }}/app.sh
       args:
         chdir: "{{ app_dir }}"
-      register: deploy_output
-
-    - name: Show deployment output
-      debug:
-        var: deploy_output.stdout_lines
-
-    - name: Wait for API
-      uri:
-        url: "http://localhost:8000/health"
-        status_code: 200
-      register: result
-      until: result.status == 200
-      retries: 10
-      delay: 5
-
-    - name: Add healthcheck to cron
-      cron:
-        name: "Docker healthcheck"
-        minute: "*/5"
-        job: "{{ app_dir }}/healthcheck.sh >> /var/log/healthcheck.log 2>&1"
-        user: root
-
-
