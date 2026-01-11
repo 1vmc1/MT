@@ -5,7 +5,7 @@ variable "image_name" {
 
 variable "flavor_name" {
   type    = string
-  default = "m1.medium"
+  default = "m1.small"
 }
 
 variable "network_name" {
