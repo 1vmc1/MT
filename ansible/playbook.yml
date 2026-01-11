@@ -25,7 +25,20 @@
           - lsb-release
         state: present
         update_cache: yes
+    - name: Remove old Docker APT sources (if any)
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/docker.list
+        - /etc/apt/sources.list.d/docker.list.save
+      ignore_errors: true
 
+    - name: Remove old Docker keyring (if any)
+      file:
+        path: /etc/apt/keyrings/docker.asc
+        state: absent
+      ignore_errors: true
     - name: Add Docker GPG key
       apt_key:
         url: https://download.docker.com/linux/ubuntu/gpg
@@ -100,4 +113,5 @@
     - name: Show deploy output
       debug:
         var: deploy_out.stdout_lines
+
 
