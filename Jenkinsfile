@@ -3,7 +3,7 @@ pipeline {
 
    environment {
         OS_CLOUD = 'mycloud'
-        TELEGRAM_TOKEN = credentials('TELEGRAM_TOKEN')  // ← ДОБАВЬ ЭТУ СТРОКУ
+        TELEGRAM_TOKEN = credentials('8137581059:AAFOSgGg1RE-Kq0coZceSYncj_L89DMdYK0')  // ← ДОБАВЬ ЭТУ СТРОКУ
     }
 
     stages {
