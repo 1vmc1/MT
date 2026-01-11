@@ -1,9 +1,9 @@
 pipeline {
     agent { label 'vmc2' }
 
-   environment {
+    environment {
         OS_CLOUD = 'mycloud'
-        TELEGRAM_TOKEN = credentials('8137581059:AAFOSgGg1RE-Kq0coZceSYncj_L89DMdYK0')  // ← ДОБАВЬ ЭТУ СТРОКУ
+        TELEGRAM_TOKEN = credentials('TELEGRAM_TOKEN')  // ← ID credential, а не сам токен!
     }
 
     stages {
@@ -63,6 +63,7 @@ pipeline {
                         ansible-playbook \
                           -i inventory.ini \
                           --ssh-common-args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' \
+                          -e "telegram_token=${TELEGRAM_TOKEN}" \
                           playbook.yml
                     '''
                 }
