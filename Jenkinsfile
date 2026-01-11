@@ -1,8 +1,9 @@
 pipeline {
     agent { label 'vmc2' }
 
-    environment {
+   environment {
         OS_CLOUD = 'mycloud'
+        TELEGRAM_TOKEN = credentials('TELEGRAM_TOKEN')  // ← ДОБАВЬ ЭТУ СТРОКУ
     }
 
     stages {
