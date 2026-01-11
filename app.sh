@@ -15,26 +15,16 @@ if [[ ! -f .env ]]; then
     exit 1
 fi
 
-# ✅ ЗАЩИТА: проверяем, что Dockerfile — реально Dockerfile
-if [[ ! -f Dockerfile ]]; then
-    echo -e "${RED}[ERROR] Dockerfile not found!${NC}"
-    exit 1
-fi
-
-head -1 Dockerfile | grep -q '^FROM' || {
-    echo -e "${RED}[ERROR] Dockerfile is invalid (does not start with FROM)${NC}"
-    echo -e "${YELLOW}First line of Dockerfile:${NC}"
-    head -1 Dockerfile
-    exit 1
-}
-
 # Остановка старых контейнеров
 echo -e "${YELLOW}[app.sh] Stopping old containers...${NC}"
 docker compose down --remove-orphans 2>/dev/null || true
 
-# Сборка и запуск
-echo -e "${YELLOW}[app.sh] Building and starting containers...${NC}"
-docker compose build --no-cache
+# Загрузка свежих образов из Docker Hub
+echo -e "${YELLOW}[app.sh] Pulling latest images from Docker Hub...${NC}"
+docker compose pull
+
+# Запуск контейнеров
+echo -e "${YELLOW}[app.sh] Starting containers...${NC}"
 docker compose up -d
 
 # Ожидание запуска
@@ -54,6 +44,7 @@ for i in {1..10}; do
     fi
     if [ $i -eq 10 ]; then
         echo -e "${RED}✗ API health check failed after 10 attempts${NC}"
+        exit 1
     else
         echo "Attempt $i/10 failed, retrying in 3s..."
         sleep 3
