@@ -108,6 +108,7 @@
         sed -n '1,30p' {{ remote_app_dir }}/docker-compose.yml || true
       args:
         executable: /bin/bash
+      register: dbg  # <--- ДОБАВЬ ЭТУ СТРОКУ
       changed_when: false
 
     - name: Show debug output
@@ -123,6 +124,7 @@
     - name: Show deploy output
       debug:
         var: deploy_out.stdout_lines
+
 
 
 
