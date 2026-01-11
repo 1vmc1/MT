@@ -1,12 +1,25 @@
-fastapi>=0.115,<0.116
-uvicorn>=0.30,<0.34
+# Web frameworks
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
 python-multipart==0.0.20
-aiohttp==3.10.11
+
+# Telegram bot
 python-telegram-bot==21.7
-numpy
-librosa
-soundfile
-torch
-torchvision
-torchaudio
-scikit-learn
+aiohttp==3.10.11
+
+# ML/Audio
+torch==2.5.1
+torchaudio==2.5.1
+librosa==0.10.2.post1
+soundfile==0.12.1
+numpy==1.26.4
+scikit-learn==1.5.2
+
+# Gmail OAuth (если используется server.py)
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+google-api-python-client==2.154.0
+apscheduler==3.10.4
+
+# Utilities
+python-dotenv==1.0.1
