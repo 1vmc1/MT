@@ -27,12 +27,12 @@
         content: "TELEGRAM_BOT_TOKEN={{ telegram_token }}\n"
         mode: '0600'
 
-    - name: Pull latest images from Docker Hub
-      community.docker.docker_compose:
-        project_src: "{{ remote_app_dir }}"
-        pull: true
+  - name: Pull latest images
+      shell: docker-compose pull
+      args:
+        chdir: "{{ remote_app_dir }}"
 
     - name: Start containers
-      community.docker.docker_compose:
-        project_src: "{{ remote_app_dir }}"
-        state: present
+      shell: docker-compose up -d
+      args:
+        chdir: "{{ remote_app_dir }}"
