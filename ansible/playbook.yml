@@ -1,15 +1,75 @@
 ---
-- name: Deploy Music App with Docker Compose
+- name: Install Docker and Deploy Music App
   hosts: servers
   become: yes
   vars:
     model_filename: best_model_heavy_m192_h256_gru256x2.pth
     model_dest: /opt/music-app/best_model_heavy_m192_h256_gru256x2.pth
-    # Прямая ссылка на скачивание
     release_url: "https://github.com/1vmc1/MT/releases/download/1.0/{{ model_filename }}"
     app_dir: /opt/music-app
 
   tasks:
+    # --- СЕКЦИЯ УСТАНОВКИ DOCKER ---
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - python3-pip
+        state: present
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker Engine
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+        update_cache: yes
+
+    - name: Install Docker Compose via pip
+      pip:
+        name: docker-compose
+        state: present
+
+    - name: Ensure docker service is started
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Docker Login
+      docker_login:
+        username: "{{ docker_user }}"
+        password: "{{ docker_pass }}"
+      # Игнорируем ошибки, если логин не критичен для публичных образов
+      ignore_errors: yes
+
+    # --- СЕКЦИЯ ДЕПЛОЯ ПРИЛОЖЕНИЯ ---
     - name: Ensure remote app directory exists
       file:
         path: "{{ app_dir }}"
@@ -42,9 +102,7 @@
         owner: ubuntu
         group: ubuntu
         timeout: 600
-        # force: yes заставит Ansible скачать файл заново, игнорируя старый/пустой
         force: yes
-      register: download_result
 
     - name: Verify model file size
       stat:
