@@ -45,58 +45,25 @@ pipeline {
             }
         }
 
-        stage('Install Docker on VM') {
+        stage('Deploy with Ansible') {
             steps {
                 dir('ansible') {
-                    sh '''
-                        set -e
-                        VM_IP=$(cat ip.txt)
-                        ssh -o StrictHostKeyChecking=no -i ~/.ssh/jenkins_deploy_rsa ubuntu@${VM_IP} bash -s <<'EOF'
-set -e
-sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release python3-pip software-properties-common
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-sudo usermod -aG docker ubuntu || true
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose || true
-sudo chmod +x /usr/local/bin/docker-compose || true
-sudo pip3 install docker || true
-EOF
-                    '''
-                }
-            }
-        }
-
-        stage('Docker Login') {
-            steps {
-                dir('ansible') {
+                    // Используем Docker Hub credentials для логина внутри Ansible
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh '''
                             set -e
                             VM_IP=$(cat ip.txt)
-                            ssh -o StrictHostKeyChecking=no -i ~/.ssh/jenkins_deploy_rsa ubuntu@${VM_IP} "echo \$DOCKER_PASS | sudo docker login --username \$DOCKER_USER --password-stdin"
+                            echo "[servers]" > inventory.ini
+                            echo "vm ansible_host=${VM_IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/jenkins_deploy_rsa" >> inventory.ini
+
+                            ansible-playbook -i inventory.ini \
+                              --ssh-common-args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' \
+                              -e "telegram_token=${TELEGRAM_TOKEN}" \
+                              -e "docker_user=${DOCKER_USER}" \
+                              -e "docker_pass=${DOCKER_PASS}" \
+                              playbook.yml
                         '''
                     }
-                }
-            }
-        }
-
-        stage('Deploy with Ansible') {
-            steps {
-                dir('ansible') {
-                    sh '''
-                        set -e
-                        VM_IP=$(cat ip.txt)
-                        echo "[servers]" > inventory.ini
-                        echo "vm ansible_host=${VM_IP} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/jenkins_deploy_rsa" >> inventory.ini
-
-                        ansible-playbook -i inventory.ini \
-                          --ssh-common-args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' \
-                          -e "telegram_token=${TELEGRAM_TOKEN}" \
-                          playbook.yml
-                    '''
                 }
             }
         }
