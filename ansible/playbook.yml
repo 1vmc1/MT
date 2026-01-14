@@ -14,10 +14,16 @@
         path: /opt/music-app/best_model_heavy_m192_h256_gru256x2.pth
         state: absent
 
-    - name: Copy docker-compose.yml
+    - name: Copy docker-compose.yml from root
       copy:
-        src: docker-compose.yml
+        src: ../docker-compose.yml
         dest: /opt/music-app/docker-compose.yml
+        mode: '0644'
+
+    - name: Copy labels.json from root
+      copy:
+        src: ../labels.json
+        dest: /opt/music-app/labels.json
         mode: '0644'
 
     - name: Download model file from GitHub Releases
