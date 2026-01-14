@@ -5,12 +5,11 @@
   vars:
     model_filename: best_model_heavy_m192_h256_gru256x2.pth
     model_dest: /opt/music-app/best_model_heavy_m192_h256_gru256x2.pth
+    # Прямая ссылка на скачивание
     release_url: "https://github.com/1vmc1/MT/releases/download/1.0/{{ model_filename }}"
     app_dir: /opt/music-app
-    download_retries: 3
-    download_delay: 5
-  tasks:
 
+  tasks:
     - name: Ensure remote app directory exists
       file:
         path: "{{ app_dir }}"
@@ -18,32 +17,6 @@
         mode: '0755'
         owner: ubuntu
         group: ubuntu
-
-    - name: Remove any existing model path
-      file:
-        path: "{{ model_dest }}"
-        state: absent
-
-    - name: Remove any existing labels.json
-      file:
-        path: "{{ app_dir }}/labels.json"
-        state: absent
-
-    - name: Ensure parent directory exists (redundant-safe)
-      file:
-        path: "{{ app_dir }}"
-        state: directory
-        mode: '0755'
-        owner: ubuntu
-        group: ubuntu
-
-    - name: Create empty placeholder file for model (guarantee file type)
-      copy:
-        content: ""
-        dest: "{{ model_dest }}"
-        owner: ubuntu
-        group: ubuntu
-        mode: '0644'
 
     - name: Copy docker-compose.yml from repo root
       copy:
@@ -61,26 +34,7 @@
         group: ubuntu
         mode: '0644'
 
-    - name: Verify model URL is reachable (HEAD)
-      uri:
-        url: "{{ release_url }}"
-        method: HEAD
-        return_content: no
-        status_code: [200,301,302]
-      register: url_check
-      ignore_errors: yes
-
-    - name: Fail with helpful message if URL check failed
-      fail:
-        msg: |
-          Model asset not reachable at {{ release_url }} (status={{ url_check.status | default('no response') }}).
-          Options:
-            - Ensure the release asset exists and is public
-            - Adjust release_url to correct tag/filename
-            - If network access blocked, ensure outbound access to github.com and release assets
-      when: url_check is failed or url_check.status is not defined
-
-    - name: Download model file from GitHub Releases (public release)
+    - name: Download model file from GitHub Releases
       get_url:
         url: "{{ release_url }}"
         dest: "{{ model_dest }}"
@@ -88,35 +42,25 @@
         owner: ubuntu
         group: ubuntu
         timeout: 600
+        # force: yes заставит Ansible скачать файл заново, игнорируя старый/пустой
+        force: yes
       register: download_result
-      until: download_result is succeeded
-      retries: "{{ download_retries }}"
-      delay: "{{ download_delay }}"
 
-    - name: Stat model file
+    - name: Verify model file size
       stat:
         path: "{{ model_dest }}"
       register: model_stat
 
-    - name: Fail if model file is empty or missing
+    - name: Fail if model file is too small (less than 1MB)
       fail:
-        msg: "Model file {{ model_dest }} is missing or zero-sized after download."
-      when: model_stat.stat.exists == false or (model_stat.stat.size | default(0) == 0)
-
-    - name: Show model file info (debug)
-      command: ls -lh "{{ model_dest }}"
-      register: model_ls
-      changed_when: false
-
-    - name: Print model ls output
-      debug:
-        var: model_ls.stdout_lines
+        msg: "Model file is too small ({{ model_stat.stat.size }} bytes). Download probably failed."
+      when: model_stat.stat.size < 1000000
 
     - name: Create .env file with Telegram token
       copy:
         dest: "{{ app_dir }}/.env"
         content: |
-          TELEGRAM_TOKEN={{ telegram_token | default('') }}
+          TELEGRAM_TOKEN={{ telegram_token }}
         mode: '0600'
         owner: ubuntu
         group: ubuntu
