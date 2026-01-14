@@ -7,6 +7,8 @@
     model_dest: /opt/music-app/best_model_heavy_m192_h256_gru256x2.pth
     release_url: "https://github.com/1vmc1/MT/releases/download/1.0/{{ model_filename }}"
     app_dir: /opt/music-app
+    # формируем заголовок авторизации, если токен передан
+    github_auth_header: "{{ {'Authorization': 'token ' + github_token} if (github_token is defined and github_token | length > 0) else {} }}"
 
   tasks:
     - name: Ensure remote app directory exists
@@ -59,6 +61,28 @@
         owner: ubuntu
         group: ubuntu
 
+    - name: Verify model URL is reachable (follow redirects)
+      uri:
+        url: "{{ release_url }}"
+        method: HEAD
+        return_content: no
+        status_code: [200,301,302]
+        headers: "{{ github_auth_header }}"
+        follow_redirects: all
+      register: url_check
+      failed_when: url_check.status is defined and (url_check.status | int) not in [200,301,302]
+      ignore_errors: yes
+
+    - name: Fail with helpful message if URL check failed
+      fail:
+        msg: |
+          Model asset not reachable at {{ release_url }} (status={{ url_check.status | default('no response') }}).
+          Options:
+            - Upload asset named "{{ model_filename }}" to release "1.0"
+            - Adjust release_url to correct tag/filename
+            - Ensure github_token (PAT) with repo access is passed from Jenkins
+      when: url_check is failed or url_check.status is not defined
+
     - name: Download model file from GitHub Releases (private repo with token)
       get_url:
         url: "{{ release_url }}"
@@ -68,12 +92,7 @@
         group: ubuntu
         timeout: 600
         force_basic_auth: yes
-        headers: >
-          {% if github_token is defined and github_token|length > 0 %}
-          {"Authorization": "token {{ github_token }}"}
-          {% else %}
-          {}
-          {% endif %}
+        headers: "{{ github_auth_header }}"
       register: download_result
       until: download_result is not failed
       retries: 3
