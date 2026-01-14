@@ -70,7 +70,7 @@
         headers:
           Authorization: "token {{ github_token }}"
       register: download_result
-      failed_when: download_result.status is defined and download_result.status not in [200,201,204]
+      failed_when: download_result is failed or (download_result.status is defined and download_result.status not in [200,201,204])
 
     - name: Stat model file
       stat:
@@ -79,7 +79,7 @@
 
     - name: Fail if model file is empty or missing
       fail:
-        msg: "Model file {{ model_dest }} is missing or zero-sized after download (status={{ download_result.status }})."
+        msg: "Model file {{ model_dest }} is missing or zero-sized after download."
       when: model_stat.stat.exists == false or model_stat.stat.size | default(0) == 0
 
     - name: Show model file info (debug)
