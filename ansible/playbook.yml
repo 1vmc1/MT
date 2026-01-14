@@ -9,13 +9,12 @@
     app_dir: /opt/music-app
 
   tasks:
-    # --- СЕКЦИЯ УСТАНОВКИ DOCKER ---
-    - name: Update apt cache
+    - name: Update APT cache
       apt:
         update_cache: yes
         cache_valid_time: 3600
 
-    - name: Install dependencies
+    - name: Ensure common packages are installed
       apt:
         name:
           - apt-transport-https
@@ -24,19 +23,35 @@
           - gnupg
           - lsb-release
           - python3-pip
+          - software-properties-common
         state: present
+
+    - name: Ensure pip is up-to-date
+      pip:
+        name: pip
+        state: latest
+        executable: pip3
+
+    - name: Upgrade pyOpenSSL and cryptography (fixes get_url pyOpenSSL bug)
+      pip:
+        name:
+          - pyOpenSSL
+          - cryptography
+          - urllib3[secure]
+        state: latest
+        executable: pip3
 
     - name: Add Docker GPG key
       apt_key:
         url: https://download.docker.com/linux/ubuntu/gpg
         state: present
 
-    - name: Add Docker repository
+    - name: Add Docker apt repository
       apt_repository:
         repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
         state: present
 
-    - name: Install Docker Engine
+    - name: Install Docker packages
       apt:
         name:
           - docker-ce
@@ -45,12 +60,13 @@
         state: present
         update_cache: yes
 
-    - name: Install Docker Compose via pip
+    - name: Install docker-compose via pip3
       pip:
         name: docker-compose
         state: present
+        executable: pip3
 
-    - name: Ensure docker service is started
+    - name: Ensure docker service is started and enabled
       service:
         name: docker
         state: started
@@ -62,14 +78,12 @@
         groups: docker
         append: yes
 
-    - name: Docker Login
+    - name: Docker login (uses docker_user/docker_pass from Jenkins)
       docker_login:
-        username: "{{ docker_user }}"
-        password: "{{ docker_pass }}"
-      # Игнорируем ошибки, если логин не критичен для публичных образов
+        username: "{{ docker_user | default('') }}"
+        password: "{{ docker_pass | default('') }}"
       ignore_errors: yes
 
-    # --- СЕКЦИЯ ДЕПЛОЯ ПРИЛОЖЕНИЯ ---
     - name: Ensure remote app directory exists
       file:
         path: "{{ app_dir }}"
@@ -103,32 +117,46 @@
         group: ubuntu
         timeout: 600
         force: yes
+      register: download_result
 
-    - name: Verify model file size
+    - name: Stat model file
       stat:
         path: "{{ model_dest }}"
       register: model_stat
 
-    - name: Fail if model file is too small (less than 1MB)
+    - name: Fail if model file is missing or too small (less than 1MB)
       fail:
-        msg: "Model file is too small ({{ model_stat.stat.size }} bytes). Download probably failed."
-      when: model_stat.stat.size < 1000000
+        msg: "Model file {{ model_dest }} is missing or too small ({{ model_stat.stat.size | default(0) }} bytes)."
+      when: model_stat.stat.exists == false or (model_stat.stat.size | default(0) < 1000000)
 
     - name: Create .env file with Telegram token
       copy:
         dest: "{{ app_dir }}/.env"
         content: |
-          TELEGRAM_TOKEN={{ telegram_token }}
+          TELEGRAM_TOKEN={{ telegram_token | default('') }}
         mode: '0600'
         owner: ubuntu
         group: ubuntu
 
-    - name: Pull latest images
+    - name: Pull latest images (docker-compose)
       shell: docker-compose pull
       args:
         chdir: "{{ app_dir }}"
+      register: pull_result
+      retries: 2
+      delay: 5
+      ignore_errors: yes
 
-    - name: Start containers
+    - name: Start containers (docker-compose up -d)
       shell: docker-compose up -d
       args:
         chdir: "{{ app_dir }}"
+      register: compose_up
+
+    - name: Show docker ps output (debug)
+      shell: sudo docker ps --format 'table {{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}'
+      register: docker_ps
+      changed_when: false
+
+    - debug:
+        var: docker_ps.stdout_lines
