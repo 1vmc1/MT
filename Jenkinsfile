@@ -3,9 +3,7 @@ pipeline {
 
     environment {
         OS_CLOUD = 'mycloud'
-        // TELEGRAM_TOKEN — должен быть сохранён в Jenkins (Secret text)
         TELEGRAM_TOKEN = credentials('TELEGRAM_TOKEN')
-        // Не используем GitHub token — репозиторий публичный
     }
 
     stages {
@@ -74,7 +72,6 @@ EOF
         stage('Docker Login') {
             steps {
                 dir('ansible') {
-                    // Замените 'docker-hub-cred' на ваш credentialsId (username/password)
                     withCredentials([usernamePassword(credentialsId: 'docker-hub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh '''
                             set -e
