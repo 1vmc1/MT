@@ -58,11 +58,17 @@
         state: present
         update_cache: yes
 
-    - name: Install docker-compose via pip3
+    - name: Remove docker-compose installed by pip (if any)
       pip:
         name: docker-compose
-        state: present
+        state: absent
         executable: pip3
+
+    - name: Download docker-compose binary
+      get_url:
+        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-{{ ansible_system }}-{{ ansible_machine }}"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
 
     - name: Ensure docker service is started and enabled
       service:
