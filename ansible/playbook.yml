@@ -1,36 +1,45 @@
-- name: Deploy Music App with Docker Compose (shell fallback)
-  hosts: all
+---
+- name: Deploy Music App with Docker Compose
+  hosts: servers
   become: yes
-
-  vars:
-    local_project_root: "{{ playbook_dir }}/.."
-    remote_app_dir: /opt/music-app
-
   tasks:
     - name: Ensure remote app directory exists
       file:
-        path: "{{ remote_app_dir }}"
+        path: /opt/music-app
         state: directory
         mode: '0755'
 
+    - name: Remove accidental directory created by docker
+      file:
+        path: /opt/music-app/best_model_heavy_m192_h256_gru256x2.pth
+        state: absent
+
     - name: Copy docker-compose.yml
       copy:
-        src: "{{ local_project_root }}/docker-compose.yml"
-        dest: "{{ remote_app_dir }}/docker-compose.yml"
-        mode: "0644"
+        src: docker-compose.yml
+        dest: /opt/music-app/docker-compose.yml
+        mode: '0644'
+
+    - name: Download model file from GitHub Releases
+      get_url:
+        url: "https://github.com/1vmc1/MT/releases/download/1.0/best_model_heavy_m192_h256_gru256x2.pth"
+        dest: /opt/music-app/best_model_heavy_m192_h256_gru256x2.pth
+        mode: '0644'
+        timeout: 300
 
     - name: Create .env file with Telegram token
       copy:
-        dest: "{{ remote_app_dir }}/.env"
-        content: "TELEGRAM_BOT_TOKEN={{ telegram_token }}\n"
+        dest: /opt/music-app/.env
+        content: |
+          TELEGRAM_TOKEN={{ telegram_token }}
         mode: '0600'
 
     - name: Pull latest images
       shell: docker-compose pull
       args:
-        chdir: "{{ remote_app_dir }}"
+        chdir: /opt/music-app
 
     - name: Start containers
       shell: docker-compose up -d
       args:
-        chdir: "{{ remote_app_dir }}"
+        chdir: /opt/music-app
